@@ -29,6 +29,7 @@ const querystring = require('querystring');
 ///////////////////////////////////////////////////////////////////////////////
 
 module.exports = function( ctx, cb ) {
+  if (!ctx) { return testingAccess(); }
   getTemp( ctx.secrets.LOCALE, getPrevTemp, logFail, ctx );
   cb( null, "dispatched" );
 };
@@ -51,11 +52,11 @@ function compareTemps( prevTemp, currTemp, ctx ) {
   const smsDest = ctx.secrets.SMS_DEST;
   const emailDest = ctx.secrets.EMAIL_DEST;
   const emailSrc = ctx.secrets.EMAIL_SRC;   
-  if ( prev < Setpoint && curr > Setpoint ) {
+  if ( prev <= Setpoint && curr > Setpoint ) {
     console.log( "sending sms..." );
     const msg = `close the windows! prev=${prev},curr=${curr}`;	
     sendSms( smsDest, msg, logFail, ctx );
-  } else if (prev > Setpoint && curr < Setpoint) {
+  } else if (prev > Setpoint && curr <= Setpoint) {
     console.log( "sending email..." );
     const msg = `open the windows? prev=${prev},curr=${curr}`;
     sendEmail( emailDest, emailSrc, msg, msg, logFail, ctx );
@@ -64,16 +65,17 @@ function compareTemps( prevTemp, currTemp, ctx ) {
 
 function getPrevTemp( currTemp, failFunc, ctx ) {
   console.log( "curr temp:", currTemp );
+  const InitialTemp = (ctx.secrets.SET_POINT || 74) * 2;
   ctx.storage.get( function( error, dataJsonDoc ) {
-      if (error) { console.log( "storage-get error", error ); }
-      console.log( "storage-got:", dataJsonDoc );
-      dataJsonDoc = dataJsonDoc || { prevTemp: 74 };
-      const prevTemp = dataJsonDoc.prevTemp;
-      dataJsonDoc.prevTemp = currTemp;
-      ctx.storage.set( dataJsonDoc, function(error) {
-        if (error) { console.log( "storage-set error", error ); }
-      } );
-      compareTemps( prevTemp, currTemp, ctx );
+    if (error) { console.log( "storage-get error", error ); }
+    console.log( "storage-got:", dataJsonDoc );
+    dataJsonDoc = dataJsonDoc || { prevTemp: InitialTemp };
+    const prevTemp = dataJsonDoc.prevTemp;
+    dataJsonDoc.prevTemp = currTemp;
+    ctx.storage.set( dataJsonDoc, function(error) {
+      if (error) { console.log( "storage-set error", error ); }
+    } );
+    compareTemps( prevTemp, currTemp, ctx );
   } );
 }
 
